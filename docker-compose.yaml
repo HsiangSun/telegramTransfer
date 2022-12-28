@@ -1,0 +1,8 @@
+version: "2.1"
+
+services:
+  transfer:
+    image: hsiangsun/telegram_transfer:v1
+    restart: always
+    volumes:
+      - C:\Users\sean\Desktop\testDB:/app/db
