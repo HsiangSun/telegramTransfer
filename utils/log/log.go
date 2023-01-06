@@ -29,7 +29,8 @@ func getEncoder() zapcore.Encoder {
 }
 
 func getLogWriter() zapcore.WriteSyncer {
-	logPath := fmt.Sprintf("%s%s%s%s", config.AppPath, "log", string(os.PathSeparator), "log")
+	logPath := fmt.Sprintf("%s%s%s", config.AppPath, string(os.PathSeparator), "log")
+	fmt.Println("LogPath:" + logPath)
 	file := fmt.Sprintf("%s/log_%s.log",
 		logPath,
 		time.Now().Format("20060102"))

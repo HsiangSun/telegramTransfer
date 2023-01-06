@@ -31,5 +31,7 @@ func BootRun() {
 }
 
 func RegisterHandle() {
+	//Bot.Handle(tb.OnText, OnTextMessage)
 	Bot.Handle(tb.OnText, OnTextMessage)
+	Bot.Handle(tb.OnPhoto, OnTextMessage)
 }

@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"fmt"
 	tb "gopkg.in/telebot.v3"
 	"sync"
 	"telgramTransfer/model"
@@ -16,6 +17,8 @@ func OnTextMessage(c tb.Context) error {
 	if c.Text() == "/start" {
 		return nil
 	}
+
+	//fmt.Println(fmt.Sprintf("private id:%d", c.Chat().ID))
 
 	admins := config.BootC.Admins
 	if c.Text() == "绑定" {
@@ -55,8 +58,14 @@ func OnTextMessage(c tb.Context) error {
 
 				defer wg.Done()
 
+				fmt.Printf("Forward ==> %d", group.Gid)
+
 				to := tb.Chat{ID: group.Gid}
-				c.Bot().Forward(&to, c.Message())
+
+				_, err = c.Bot().Forward(&to, c.Message())
+				if err != nil {
+					log.Sugar.Errorf("Forward error:%s", err.Error())
+				}
 
 			}()
 		}
