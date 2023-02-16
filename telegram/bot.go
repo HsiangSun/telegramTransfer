@@ -3,6 +3,7 @@ package telegram
 import (
 	tb "gopkg.in/telebot.v3"
 	"log"
+
 	"telgramTransfer/utils/config"
 	"time"
 )
@@ -33,5 +34,6 @@ func BootRun() {
 func RegisterHandle() {
 	//Bot.Handle(tb.OnText, OnTextMessage)
 	Bot.Handle(tb.OnText, OnTextMessage)
-	Bot.Handle(tb.OnPhoto, OnTextMessage)
+	Bot.Handle(tb.OnPhoto, OnImageMessage)
+	Bot.Handle(tb.OnVideo, OnVideoMessage)
 }
