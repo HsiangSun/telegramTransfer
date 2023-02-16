@@ -12,6 +12,7 @@ import (
 	"strings"
 	"telgramTransfer/crypt"
 	"telgramTransfer/model"
+	"telgramTransfer/utils/config"
 	"telgramTransfer/utils/log"
 	"telgramTransfer/utils/orm"
 	"telgramTransfer/utils/tool"
@@ -213,7 +214,9 @@ func checkOrder(c tb.Context, text string) error {
 
 	client := http.Client{Timeout: 5 * time.Second}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("https://fourpay-intest.ncjimmy.com/botapi/Xc/Order?id=%s", text), nil)
+	var apiUrl = config.Apic.Url
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/botapi/Xc/Order?id=%s", apiUrl, text), nil)
 	req.Header = http.Header{
 		"Authorization": {auth},
 	}

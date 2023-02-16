@@ -19,8 +19,13 @@ type Log struct {
 	MaxBackups int `mapstructure:"max_backups"`
 }
 
+type Api struct {
+	Url string `mapstructure:"url"`
+}
+
 var BootC Boot
 var LogC Log
+var Apic Api
 
 func InitConfig() {
 	path, err := os.Getwd()
@@ -40,5 +45,9 @@ func InitConfig() {
 	err = viper.UnmarshalKey("boot", &BootC)
 	if err != nil {
 		log.Fatal("load config log err:", err)
+	}
+	err = viper.UnmarshalKey("api", &Apic)
+	if err != nil {
+		log.Fatal("load config api err:", err)
 	}
 }
