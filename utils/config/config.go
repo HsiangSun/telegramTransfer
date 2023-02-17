@@ -23,9 +23,14 @@ type Api struct {
 	Url string `mapstructure:"url"`
 }
 
+type Order struct {
+	Match string `mapstructure:"match"`
+}
+
 var BootC Boot
 var LogC Log
 var Apic Api
+var OrderC Order
 
 func InitConfig() {
 	path, err := os.Getwd()
@@ -47,6 +52,10 @@ func InitConfig() {
 		log.Fatal("load config log err:", err)
 	}
 	err = viper.UnmarshalKey("api", &Apic)
+	if err != nil {
+		log.Fatal("load config api err:", err)
+	}
+	err = viper.UnmarshalKey("order", &OrderC)
 	if err != nil {
 		log.Fatal("load config api err:", err)
 	}

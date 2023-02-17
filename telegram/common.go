@@ -35,7 +35,9 @@ func GetOrderFromText(text string) string {
 	var isAllAreOrder = true
 	for _, order := range orders {
 		//检测每一行是否是单号
-		reg := regexp.MustCompile(`^2023\d{16,19}$`)
+
+		match := config.OrderC.Match
+		reg := regexp.MustCompile(match)
 		result := reg.FindAllStringSubmatch(order, -1)
 
 		//没有匹配上，不是单号信息 不处理
@@ -54,7 +56,8 @@ func GetOrderFromText(text string) string {
 
 //判断当前信息是否是订单号
 func IsOrder(text string) bool {
-	reg := regexp.MustCompile(`^2023\d{16,19}$`)
+	match := config.OrderC.Match
+	reg := regexp.MustCompile(match)
 	result := reg.FindAllStringSubmatch(text, -1)
 
 	//没有匹配上，不是单号信息 不处理
@@ -108,7 +111,7 @@ func GetPlatByOrderId(orderId string) (*ApiRsp, error) {
 
 	jerr := json.Unmarshal(rspBytes, &rsp)
 	if jerr != nil {
-		log.Sugar.Errorf("查询订单响应错误:%s", string(rspBytes))
+		log.Sugar.Errorf("查询订单响应错误:%s,api msg:%s", string(rspBytes), string(rspBytes))
 		return nil, jerr
 	}
 
