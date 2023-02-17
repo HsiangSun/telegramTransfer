@@ -158,7 +158,7 @@ func chanelInVideoHandler(c tb.Context, currentChanel model.Channel) error {
 			return err
 		}
 	} else {
-		if c.Update().Message.Photo == nil {
+		if c.Update().Message.Video == nil {
 			return nil
 		}
 
