@@ -5,7 +5,6 @@ import (
 	"errors"
 	tb "gopkg.in/telebot.v3"
 	"gorm.io/gorm"
-	"regexp"
 	"strings"
 	"telgramTransfer/model"
 	"telgramTransfer/utils/log"
@@ -29,51 +28,40 @@ func OnVideoMessage(c tb.Context) error {
 	}
 	//判断当前群是否是下游群
 	if currentChanel.Type == model.CHANNELTYPE_IN {
-		outChan, err := FindPeerChanel(currentChanel.Name, model.CHANNELTYPE_OUT)
-		if err != nil {
-			log.Sugar.Errorf("无法找到匹配的群绑定关系：channel_id:%d,tagName:%s", currentChanel.ChannelId, currentChanel.Name)
-			return c.Reply("群绑定关系错误,请联系管理员")
-		}
-		return chanelInVideoHandler(c, currentChanel, *outChan)
+		return chanelInVideoHandler(c, currentChanel)
 	} else if currentChanel.Type == model.CHANNELTYPE_OUT {
-		inChan, err := FindPeerChanel(currentChanel.Name, model.CHANNELTYPE_IN)
-		if err != nil {
-			log.Sugar.Errorf("无法找到匹配的群绑定关系：channel_id:%d,tagName:%s", currentChanel.ChannelId, currentChanel.Name)
-			return c.Reply("群绑定关系错误,请联系管理员")
-		}
-		return chanelOutVideoHandler(c, *inChan, currentChanel)
+		return chanelOutVideoHandler(c)
 	}
 	return nil
 }
 
 //上游操作
-func chanelOutVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.Channel) error {
-	return OutChanelResponse(c, inChanel)
+func chanelOutVideoHandler(c tb.Context) error {
+	return OutChanelResponse(c)
 }
 
 //下游操作
-func chanelInVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.Channel) error {
+func chanelInVideoHandler(c tb.Context, currentChanel model.Channel) error {
 	text := c.Text()
+	firstOrderId := GetOrderFromText(text)
 
-	orders := strings.Split(text, "\n")
-
-	var isAllAreOrder = true
-
-	for _, order := range orders {
-		//检测每一行是否是单号
-		reg := regexp.MustCompile(`^2023\d{16,19}$`)
-		result := reg.FindAllStringSubmatch(order, -1)
-
-		//没有匹配上，不是单号信息 不处理
-		if result == nil {
-			isAllAreOrder = false
-			break
-		}
+	apiRsp, err := GetPlatByOrderId(firstOrderId)
+	if err != nil {
+		log.Sugar.Errorf("chanelInImgHandler api get error:%s", err.Error())
+		return err
 	}
 
-	//不是全部都是订单的话就不转发
-	if !isAllAreOrder {
-		return nil
+	channelId := apiRsp.Data.ChannelId
+
+	channel, err := FindChanelByPlatId(channelId)
+	if err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Reply("当前单号尚未绑定上游,请先绑定上游")
+		}
+
+		log.Sugar.Errorf("FindChanelByPlatId has error:%s", err.Error())
+		return err
 	}
 
 	//--------------是订单内容并且有图片---------------------
@@ -100,7 +88,7 @@ func chanelInVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.
 
 	newPhoto := model.Photo{UniqueID: uniqueID, InMessage: string(originMessageBytes)}
 
-	err := orm.Gdb.Model(model.Photo{}).Create(&newPhoto).Error
+	err = orm.Gdb.Model(model.Photo{}).Create(&newPhoto).Error
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 
@@ -114,7 +102,7 @@ func chanelInVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.
 			}
 
 			//转发到上游群
-			to := tb.Chat{ID: outChanel.ChannelId}
+			to := tb.Chat{ID: channel.ChannelId}
 
 			var outChanMsg tb.Message
 
@@ -133,7 +121,7 @@ func chanelInVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.
 				return err
 			}
 
-			return c.Reply("已加急~ 请勿重复发送图片哦")
+			return c.Reply("已加急~ 请勿重复发送视频哦")
 		}
 
 		log.Sugar.Errorf("insert data to photo has error:%s", err.Error())
@@ -142,7 +130,7 @@ func chanelInVideoHandler(c tb.Context, inChanel model.Channel, outChanel model.
 	}
 
 	//开始转发操作
-	to := tb.Chat{ID: outChanel.ChannelId}
+	to := tb.Chat{ID: channel.ChannelId}
 
 	//photo := c.Message().Photo
 	//photo.Caption = c.Text()

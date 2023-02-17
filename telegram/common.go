@@ -3,21 +3,75 @@ package telegram
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	tb "gopkg.in/telebot.v3"
 	"gorm.io/gorm"
+	"io"
+	"net/http"
+	"regexp"
+	"strings"
+	"telgramTransfer/crypt"
 	"telgramTransfer/model"
+	"telgramTransfer/utils/config"
 	"telgramTransfer/utils/log"
 	"telgramTransfer/utils/orm"
+	"time"
 )
 
-// 通过当前群查询对应的节点群
-func FindPeerChanel(tagName string, channelType model.ChannelType) (*model.Channel, error) {
+type ApiRsp struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		PlatStatus   int   `json:"plat_status"`
+		NoticeStatus int   `json:"notice_status"`
+		ChannelId    int64 `json:"channel_id"`
+	} `json:"data"`
+}
+
+//从消息中获取订单号，如果全是返回第一个否则为空
+func GetOrderFromText(text string) string {
+	orders := strings.Split(text, "\n")
+
+	var isAllAreOrder = true
+	for _, order := range orders {
+		//检测每一行是否是单号
+		reg := regexp.MustCompile(`^2023\d{16,19}$`)
+		result := reg.FindAllStringSubmatch(order, -1)
+
+		//没有匹配上，不是单号信息 不处理
+		if result == nil {
+			isAllAreOrder = false
+			break
+		}
+	}
+
+	//不是全部都是订单的话就不转发
+	if isAllAreOrder {
+		return orders[0]
+	}
+	return ""
+}
+
+//判断当前信息是否是订单号
+func IsOrder(text string) bool {
+	reg := regexp.MustCompile(`^2023\d{16,19}$`)
+	result := reg.FindAllStringSubmatch(text, -1)
+
+	//没有匹配上，不是单号信息 不处理
+	if result == nil {
+		return false
+	}
+	return true
+}
+
+//通过platId查询channel信息
+func FindChanelByPlatId(platId int64) (*model.Channel, error) {
 	var dbPeerChannel model.Channel
-	err := orm.Gdb.Model(model.Channel{}).First(&dbPeerChannel, "name = ? AND type = ?", tagName, channelType).Error
+	err := orm.Gdb.Model(model.Channel{}).First(&dbPeerChannel, "plat_id = ?", platId).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Sugar.Errorf("无法找到对应的上游群:%s", tagName)
+			log.Sugar.Errorf("无法找到对应的上游群:%d", platId)
 			return nil, err
 		}
 		log.Sugar.Errorf("从Chanel表中查询数据错误:%s", err.Error())
@@ -26,8 +80,64 @@ func FindPeerChanel(tagName string, channelType model.ChannelType) (*model.Chann
 	return &dbPeerChannel, nil
 }
 
+// 通过订单号查询 平台Id 与订单信息
+func GetPlatByOrderId(orderId string) (*ApiRsp, error) {
+	auth := crypt.TokenGenerate()
+
+	client := http.Client{Timeout: 5 * time.Second}
+
+	var apiUrl = config.Apic.Url
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/botapi/Xc/Order?id=%s", apiUrl, orderId), nil)
+	req.Header = http.Header{
+		"Authorization": {auth},
+	}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		log.Sugar.Errorf("查询订单信息失败:%s", err.Error())
+		return nil, err
+	}
+
+	rspBytes, _ := io.ReadAll(resp.Body)
+
+	//fmt.Println("RESPONSE:" + string(rspBytes))
+
+	var rsp ApiRsp
+
+	jerr := json.Unmarshal(rspBytes, &rsp)
+	if jerr != nil {
+		log.Sugar.Errorf("查询订单响应错误:%s", string(rspBytes))
+		return nil, jerr
+	}
+
+	if rsp.Code != 0 {
+		log.Sugar.Errorf("查询订单信息响应错误:%s", rsp.Msg)
+		return nil, errors.New(rsp.Msg)
+		//return nil
+	}
+	return &rsp, nil
+}
+
+// 通过当前群查询对应的节点群
+//func FindPeerChanel(tagName string, channelType model.ChannelType) (*model.Channel, error) {
+//	var dbPeerChannel model.Channel
+//	err := orm.Gdb.Model(model.Channel{}).First(&dbPeerChannel, "name = ? AND type = ?", tagName, channelType).Error
+//
+//	if err != nil {
+//		if errors.Is(err, gorm.ErrRecordNotFound) {
+//			log.Sugar.Errorf("无法找到对应的上游群:%s", tagName)
+//			return nil, err
+//		}
+//		log.Sugar.Errorf("从Chanel表中查询数据错误:%s", err.Error())
+//		return nil, err
+//	}
+//	return &dbPeerChannel, nil
+//}
+
 // 上游回复消息给下游
-func OutChanelResponse(c tb.Context, inChanel model.Channel) error {
+func OutChanelResponse(c tb.Context) error {
 	//只能上游给下游回复 ??
 	if c.Message().ReplyTo != nil {
 		var uniqueID string
@@ -59,7 +169,7 @@ func OutChanelResponse(c tb.Context, inChanel model.Channel) error {
 			}
 
 			//转发到下游群
-			to := tb.Chat{ID: inChanel.ChannelId}
+			to := tb.Chat{ID: message.Chat.ID}
 
 			sendOpts := tb.SendOptions{}
 			sendOpts.ReplyTo = &message
