@@ -56,8 +56,15 @@ func OnTextMessage(c tb.Context) error {
 func chanelInTxtHandler(c tb.Context) error {
 	text := c.Text()
 	//查单
-	if IsOrder(text) {
-		return checkOrder(c, text)
+	//if IsOrder(text) {
+	//	return checkOrder(c, text)
+	//}
+	if strings.HasPrefix(text, "查单") {
+		split := strings.Split(text, " ")
+		if len(split) != 2 {
+			return nil
+		}
+		return checkOrder(c, split[1])
 	}
 
 	//不是华泰 = 新晨
@@ -247,7 +254,10 @@ func checkOrder(c tb.Context, text string) error {
 	//auth
 	rsp, err := GetPlatByOrderId(text)
 	if err != nil {
-		log.Sugar.Errorf("查询订单错误:%s", err.Error())
+		if strings.Contains(err.Error(), "订单不存在") {
+			return c.Reply("请输入正确的订单号哦~")
+		}
+		log.Sugar.Errorf("查询订单其他错误:%s", err.Error())
 		return err
 	}
 
@@ -258,6 +268,12 @@ func checkOrder(c tb.Context, text string) error {
 
 // 绑定商户
 func bindingMerch(c tb.Context, text string) error {
+
+	isAdmin := IsAdmin(c.Sender().Username)
+
+	if !isAdmin {
+		return c.Reply("官人,请不要调戏奴家~")
+	}
 	//bindings := strings.Split(text, " ")
 	//if len(bindings) != 2 {
 	//	log.Sugar.Infof("无法完成绑定，原始信息：%s,来自:%s", text, c.Sender().FirstName+c.Sender().LastName)
@@ -283,6 +299,13 @@ func bindingMerch(c tb.Context, text string) error {
 
 // 绑定通道
 func bindingChannel(c tb.Context, text string) error {
+
+	isAdmin := IsAdmin(c.Sender().Username)
+
+	if !isAdmin {
+		return c.Reply("官人,请不要调戏奴家~")
+	}
+
 	bindings := strings.Split(text, " ")
 	if len(bindings) != 2 {
 		log.Sugar.Infof("无法完成绑定，原始信息：%s,来自:%s", text, c.Sender().FirstName+c.Sender().LastName)

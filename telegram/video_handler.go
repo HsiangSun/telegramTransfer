@@ -44,11 +44,14 @@ func chanelOutVideoHandler(c tb.Context) error {
 func chanelInVideoHandler(c tb.Context, currentChanel model.Channel) error {
 	if c.Update().Message.ReplyTo == nil {
 		text := c.Text()
-		firstOrderId := GetOrderFromText(text)
+		//firstOrderId := GetOrderFromText(text)
 
-		apiRsp, err := GetPlatByOrderId(firstOrderId)
+		apiRsp, err := GetPlatByOrderId(text)
 		if err != nil {
-			log.Sugar.Errorf("chanelInImgHandler api get error:%s", err.Error())
+			if strings.Contains(err.Error(), "订单不存在") {
+				return c.Reply("请输入正确的订单号哦~")
+			}
+			log.Sugar.Errorf("查询订单其他错误:%s", err.Error())
 			return err
 		}
 
@@ -137,7 +140,9 @@ func chanelInVideoHandler(c tb.Context, currentChanel model.Channel) error {
 		//photo.Caption = c.Text()
 
 		video := c.Message().Video
-		video.Caption = c.Text()
+		//下游单子替换为平台单号
+		video.Caption = apiRsp.Data.PlatOrderId
+		//video.Caption = c.Text()
 
 		outMessage, err := c.Bot().Send(&to, video) //tb.Protected
 		if err != nil {

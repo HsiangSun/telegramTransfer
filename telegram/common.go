@@ -18,14 +18,41 @@ import (
 	"time"
 )
 
+type ApiRspCode struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+}
+
 type ApiRsp struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
 	Data struct {
-		PlatStatus   int   `json:"plat_status"`
-		NoticeStatus int   `json:"notice_status"`
-		ChannelId    int64 `json:"channel_id"`
+		PlatStatus   int    `json:"plat_status"`
+		NoticeStatus int    `json:"notice_status"`
+		ChannelId    int64  `json:"channel_id"`
+		PlatOrderId  string `json:"plat_order_id"`
 	} `json:"data"`
+}
+
+//type ApiRspData struct {
+//	Data struct {
+//		PlatStatus   int   `json:"plat_status"`
+//		NoticeStatus int   `json:"notice_status"`
+//		ChannelId    int64 `json:"channel_id"`
+//	} `json:"data"`
+//}
+
+//当前用户是否是系统管理员
+func IsAdmin(username string) bool {
+	var res = false
+	admins := config.BootC.Admins
+	for _, admin := range admins {
+		if username == admin {
+			res = true
+			break
+		}
+	}
+	return res
 }
 
 //从消息中获取订单号，如果全是返回第一个否则为空
@@ -107,7 +134,7 @@ func GetPlatByOrderId(orderId string) (*ApiRsp, error) {
 
 	//fmt.Println("RESPONSE:" + string(rspBytes))
 
-	var rsp ApiRsp
+	var rsp ApiRspCode
 
 	jerr := json.Unmarshal(rspBytes, &rsp)
 	if jerr != nil {
@@ -116,11 +143,18 @@ func GetPlatByOrderId(orderId string) (*ApiRsp, error) {
 	}
 
 	if rsp.Code != 0 {
-		log.Sugar.Errorf("查询订单信息响应错误:%s", rsp.Msg)
 		return nil, errors.New(rsp.Msg)
-		//return nil
 	}
-	return &rsp, nil
+
+	var rspData ApiRsp
+
+	jerr = json.Unmarshal(rspBytes, &rspData)
+	if jerr != nil {
+		log.Sugar.Errorf("理论上不会出现错误:%s,api msg:%s", string(rspBytes), string(rspBytes))
+		return nil, jerr
+	}
+
+	return &rspData, nil
 }
 
 // 通过当前群查询对应的节点群

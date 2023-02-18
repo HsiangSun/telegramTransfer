@@ -47,15 +47,18 @@ func chanelInImgHandler(c tb.Context, currentChannel model.Channel) error {
 	if c.Update().Message.ReplyTo == nil {
 		text := c.Text()
 
-		firstOrderId := GetOrderFromText(text)
-		//为空不处理
-		if firstOrderId == "" {
-			return nil
-		}
+		//firstOrderId := GetOrderFromText(text)
+		////为空不处理
+		//if firstOrderId == "" {
+		//	return nil
+		//}
 
-		apiRsp, err := GetPlatByOrderId(firstOrderId)
+		apiRsp, err := GetPlatByOrderId(text)
 		if err != nil {
-			log.Sugar.Errorf("chanelInImgHandler api get error:%s", err.Error())
+			if strings.Contains(err.Error(), "订单不存在") {
+				return c.Reply("请输入正确的订单号哦~")
+			}
+			log.Sugar.Errorf("查询订单其他错误:%s", err.Error())
 			return err
 		}
 
@@ -141,7 +144,9 @@ func chanelInImgHandler(c tb.Context, currentChannel model.Channel) error {
 		to := tb.Chat{ID: channel.ChannelId}
 
 		photo := c.Message().Photo
-		photo.Caption = c.Text()
+		//下游单子替换为平台单号
+		photo.Caption = apiRsp.Data.PlatOrderId
+		//photo.Caption = c.Text()
 
 		outMessage, err := c.Bot().Send(&to, photo) //tb.Protected
 		if err != nil {
