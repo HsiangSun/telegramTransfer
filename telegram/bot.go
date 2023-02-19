@@ -34,6 +34,6 @@ func BootRun() {
 func RegisterHandle() {
 	//Bot.Handle(tb.OnText, OnTextMessage)
 	Bot.Handle(tb.OnText, OnTextMessage)
-	Bot.Handle(tb.OnPhoto, OnImageMessage)
-	Bot.Handle(tb.OnVideo, OnVideoMessage)
+	Bot.Handle(tb.OnPhoto, OnTextMessage)
+	//Bot.Handle(tb.OnVideo, OnVideoMessage)
 }
