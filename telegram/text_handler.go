@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"telgramTransfer/model"
-	"telgramTransfer/utils/config"
 	"telgramTransfer/utils/log"
 	"telgramTransfer/utils/orm"
 )
@@ -67,108 +66,53 @@ func chanelInTxtHandler(c tb.Context) error {
 		return checkOrder(c, split[1])
 	}
 
-	//不是华泰 = 新晨
-	if config.Apic.Url != "https://bsh00oo.wxyhome.com" {
+	//华泰任何信息都转发
+	if c.Update().Message.ReplyTo != nil {
+
+		//判断回复的是图片还是视频
+		var uniqueID = ""
+		if c.Update().Message.ReplyTo.Photo != nil {
+			uniqueID = c.Update().Message.ReplyTo.Photo.File.UniqueID
+		} else if c.Update().Message.ReplyTo.Video != nil {
+			uniqueID = c.Update().Message.ReplyTo.Video.File.UniqueID
+		}
+
 		//加急
-		if text == "加急" {
-			//判断是否是回复某个信息
-			if c.Update().Message.ReplyTo != nil {
-
-				//判断回复的是图片还是视频
-				var uniqueID = ""
-				if c.Update().Message.ReplyTo.Photo != nil {
-					uniqueID = c.Update().Message.ReplyTo.Photo.File.UniqueID
-				} else if c.Update().Message.ReplyTo.Video != nil {
-					uniqueID = c.Update().Message.ReplyTo.Video.File.UniqueID
-				}
-
-				//加急
-				var outChanPhoto model.Photo
-				//拿到原始上游群信息
-				err := orm.Gdb.Model(model.Photo{}).Where("unique_id = ?", uniqueID).First(&outChanPhoto).Error
-				if err != nil {
-					log.Sugar.Errorf("查询上游群图片信息失败:%s", err.Error())
-					return err
-				}
-
-				//不是订单信息
-				if outChanPhoto.ID == 0 {
-					return nil
-				}
-
-				var outChanMsg tb.Message
-
-				jerr := json.Unmarshal([]byte(outChanPhoto.OutMessage), &outChanMsg)
-				if jerr != nil {
-					log.Sugar.Errorf("json反序列化上游群消息响应失败:%s", err.Error())
-				}
-
-				//转发到上游群
-				to := tb.Chat{ID: outChanMsg.Chat.ID}
-
-				sendOpts := tb.SendOptions{}
-				sendOpts.ReplyTo = &outChanMsg
-
-				//_, err = c.Bot().Forward(&to, c.Message(), tb.ForceReply)
-				_, err = c.Bot().Send(&to, "这笔单子加急!麻烦尽快处理一下!", &sendOpts)
-				if err != nil {
-					log.Sugar.Errorf("Forward error:%s", err.Error())
-					return err
-				}
-
-				return c.Reply("已加急~ 请耐心等待回复")
-
-			}
+		var outChanPhoto model.Photo
+		//拿到原始上游群信息
+		err := orm.Gdb.Model(model.Photo{}).Where("unique_id = ?", uniqueID).First(&outChanPhoto).Error
+		if err != nil {
+			log.Sugar.Errorf("查询上游群图片信息失败:%s", err.Error())
+			return err
 		}
-	} else {
-		//华泰任何信息都转发
-		if c.Update().Message.ReplyTo != nil {
 
-			//判断回复的是图片还是视频
-			var uniqueID = ""
-			if c.Update().Message.ReplyTo.Photo != nil {
-				uniqueID = c.Update().Message.ReplyTo.Photo.File.UniqueID
-			} else if c.Update().Message.ReplyTo.Video != nil {
-				uniqueID = c.Update().Message.ReplyTo.Video.File.UniqueID
-			}
-
-			//加急
-			var outChanPhoto model.Photo
-			//拿到原始上游群信息
-			err := orm.Gdb.Model(model.Photo{}).Where("unique_id = ?", uniqueID).First(&outChanPhoto).Error
-			if err != nil {
-				log.Sugar.Errorf("查询上游群图片信息失败:%s", err.Error())
-				return err
-			}
-
-			//不是订单信息
-			if outChanPhoto.ID == 0 {
-				return nil
-			}
-
-			var outChanMsg tb.Message
-
-			jerr := json.Unmarshal([]byte(outChanPhoto.OutMessage), &outChanMsg)
-			if jerr != nil {
-				log.Sugar.Errorf("json反序列化上游群消息响应失败:%s", err.Error())
-			}
-
-			//转发到上游群
-			to := tb.Chat{ID: outChanMsg.Chat.ID}
-
-			sendOpts := tb.SendOptions{}
-			sendOpts.ReplyTo = &outChanMsg
-
-			//_, err = c.Bot().Forward(&to, c.Message(), tb.ForceReply)
-			_, err = c.Bot().Send(&to, c.Message().Text, &sendOpts)
-			if err != nil {
-				log.Sugar.Errorf("Forward error:%s", err.Error())
-				return err
-			}
-
-			return c.Reply("请耐心等待回复")
-
+		//不是订单信息
+		if outChanPhoto.ID == 0 {
+			return nil
 		}
+
+		var outChanMsg tb.Message
+
+		jerr := json.Unmarshal([]byte(outChanPhoto.OutMessage), &outChanMsg)
+		if jerr != nil {
+			log.Sugar.Errorf("json反序列化上游群消息响应失败:%s", err.Error())
+		}
+
+		//转发到上游群
+		to := tb.Chat{ID: outChanMsg.Chat.ID}
+
+		sendOpts := tb.SendOptions{}
+		sendOpts.ReplyTo = &outChanMsg
+
+		//_, err = c.Bot().Forward(&to, c.Message(), tb.ForceReply)
+		_, err = c.Bot().Send(&to, c.Message().Text, &sendOpts)
+		if err != nil {
+			log.Sugar.Errorf("Forward error:%s", err.Error())
+			return err
+		}
+
+		return c.Reply("请耐心等待回复")
+
 	}
 
 	return nil
